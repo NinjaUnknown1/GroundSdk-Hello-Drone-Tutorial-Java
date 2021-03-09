@@ -8,6 +8,7 @@ android {
 
     defaultConfig {
         applicationId "com.example.hellodrone"
+        // Minimum SDK Version supported by GroundSDK - 24
         minSdkVersion 24
         targetSdkVersion 30
         versionCode 1
@@ -22,6 +23,7 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
+    // Java 8 Compatability
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
@@ -36,4 +38,8 @@ dependencies {
     testImplementation 'junit:junit:4.+'
     androidTestImplementation 'androidx.test.ext:junit:1.1.2'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.3.0'
+
+    // Parrot GroundSDK Dependencies\
+    implementation 'com.parrot.drone.groundsdk:groundsdk:1.7.1'
+    runtimeOnly 'com.parrot.drone.groundsdk:arsdkengine:1.7.1'
 }

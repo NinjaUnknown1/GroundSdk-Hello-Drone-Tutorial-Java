@@ -5,6 +5,8 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import android.app.ApplicationErrorReport;
 import android.os.Bundle;
+import android.view.View;
+import android.widget.Button;
 import android.widget.TextView;
 
 import com.parrot.drone.groundsdk.GroundSdk;
@@ -13,6 +15,7 @@ import com.parrot.drone.groundsdk.Ref;
 import com.parrot.drone.groundsdk.device.DeviceState;
 import com.parrot.drone.groundsdk.device.Drone;
 import com.parrot.drone.groundsdk.device.instrument.BatteryInfo;
+import com.parrot.drone.groundsdk.device.pilotingitf.ManualCopterPilotingItf;
 import com.parrot.drone.groundsdk.facility.AutoConnection;
 
 public class MainActivity extends AppCompatActivity {
@@ -24,16 +27,22 @@ public class MainActivity extends AppCompatActivity {
     private Drone drone;
 
     // Reference to the current Drone State
-    private Ref<DeviceState> droneStateRef;
+    private Ref<DeviceState> droneStateRef = null;
 
     // Reference to the current Drone Battery Level
-    private Ref<BatteryInfo> droneBatteryInfoRef;
+    private Ref<BatteryInfo> droneBatteryInfoRef = null;
+
+    // Reference to a current Drone Piloting interface
+    private Ref<ManualCopterPilotingItf> pilotingItfRef = null;
 
     // Drone State TextView
     private TextView droneStateTxt;
 
     // Drone Battery Level TextView
     private TextView droneBatteryTxt;
+
+    // Take Off / Land Button
+    private Button takeOffLandBtn;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -43,6 +52,13 @@ public class MainActivity extends AppCompatActivity {
         // Get user interface instances
         droneStateTxt = findViewById(R.id.droneStateTxt);
         droneBatteryTxt = findViewById(R.id.droneBatteryTxt);
+        takeOffLandBtn = findViewById(R.id.takeOffLandBt);
+        takeOffLandBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                onTakeOffLandCLick();
+            }
+        });
 
         // Initialise user interface default values
         droneStateTxt.setText(DeviceState.ConnectionState.DISCONNECTED.toString());
@@ -85,6 +101,7 @@ public class MainActivity extends AppCompatActivity {
     private void startDroneMonitors() {
         monitorDroneState();
         monitorDroneBatteryLevel();
+        monitorPilotingInterface();
     }
 
     /*  Stop the drone monitors  */
@@ -94,11 +111,15 @@ public class MainActivity extends AppCompatActivity {
 
         droneBatteryInfoRef.close();
         droneBatteryInfoRef = null;
+
+        pilotingItfRef.close();
+        pilotingItfRef = null;
     }
 
     private void resetDroneUi() {
         droneStateTxt.setText(DeviceState.ConnectionState.DISCONNECTED.toString());
         droneBatteryTxt.setText("-%");
+        takeOffLandBtn.setEnabled(false);
     }
 
     /*  Monitor current drone state  */
@@ -121,5 +142,55 @@ public class MainActivity extends AppCompatActivity {
                 droneBatteryTxt.setText(batteryInfo.getBatteryLevel() + "%");
             }
         });
+    }
+
+    /*  Monitors current drone piloting interface  */
+    private void monitorPilotingInterface() {
+        pilotingItfRef = drone.getPilotingItf(ManualCopterPilotingItf.class, new Ref.Observer<ManualCopterPilotingItf>() {
+            @Override
+            public void onChanged(@Nullable ManualCopterPilotingItf manualCopterPilotingItf) {
+                if (manualCopterPilotingItf == null)
+                    takeOffLandBtn.setEnabled(false);
+                else
+                    managePilotingItfState(manualCopterPilotingItf);
+            }
+        });
+    }
+
+    /*  Called on Take Off / Land click  */
+    private void onTakeOffLandCLick() {
+        ManualCopterPilotingItf manualCopterPilotingItf = pilotingItfRef.get();
+        assert manualCopterPilotingItf != null;
+
+        if (manualCopterPilotingItf.canTakeOff())
+            manualCopterPilotingItf.takeOff();
+        else if (manualCopterPilotingItf.canLand())
+            manualCopterPilotingItf.land();
+    }
+
+    /*  Manage piloting interface state
+        @param itf :: the current piloting interface  */
+    private void managePilotingItfState(ManualCopterPilotingItf itf) {
+        switch (itf.getState()) {
+            case IDLE:
+                takeOffLandBtn.setEnabled(false);
+                itf.activate();
+                break;
+            case ACTIVE:
+                if (itf.canTakeOff()) {
+                    takeOffLandBtn.setEnabled(true);
+                    takeOffLandBtn.setText(getString(R.string.take_off));
+                }
+                else if (itf.canLand()) {
+                    takeOffLandBtn.setEnabled(true);
+                    takeOffLandBtn.setText(getString(R.string.land));
+                }
+                else
+                    takeOffLandBtn.setEnabled(false);
+                break;
+            default:
+                takeOffLandBtn.setEnabled(false);
+                break;
+        }
     }
 }

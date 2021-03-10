@@ -45,6 +45,15 @@
         </LinearLayout>
     </LinearLayout>
 
+    <com.parrot.drone.groundsdk.stream.GsdkStreamView
+        android:id="@+id/streamView"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        app:layout_constraintTop_toBottomOf="@id/info"
+        app:layout_constraintBottom_toTopOf="@id/takeOffLandBt"
+        tools:layout_editor_absoluteY="38dp">
+    </com.parrot.drone.groundsdk.stream.GsdkStreamView>
+
     <Button
         android:id="@+id/takeOffLandBt"
         android:layout_width="match_parent"

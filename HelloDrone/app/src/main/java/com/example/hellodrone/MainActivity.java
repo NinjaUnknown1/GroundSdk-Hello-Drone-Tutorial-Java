@@ -3,7 +3,6 @@ package com.example.hellodrone;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
-import android.app.ApplicationErrorReport;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
@@ -15,8 +14,11 @@ import com.parrot.drone.groundsdk.Ref;
 import com.parrot.drone.groundsdk.device.DeviceState;
 import com.parrot.drone.groundsdk.device.Drone;
 import com.parrot.drone.groundsdk.device.instrument.BatteryInfo;
+import com.parrot.drone.groundsdk.device.peripheral.StreamServer;
+import com.parrot.drone.groundsdk.device.peripheral.stream.CameraLive;
 import com.parrot.drone.groundsdk.device.pilotingitf.ManualCopterPilotingItf;
 import com.parrot.drone.groundsdk.facility.AutoConnection;
+import com.parrot.drone.groundsdk.stream.GsdkStreamView;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -25,6 +27,9 @@ public class MainActivity extends AppCompatActivity {
 
     // Current Drone Instance
     private Drone drone;
+
+    // Current Drone Livestream
+    private CameraLive livestream = null;
 
     // Reference to the current Drone State
     private Ref<DeviceState> droneStateRef = null;
@@ -35,6 +40,12 @@ public class MainActivity extends AppCompatActivity {
     // Reference to a current Drone Piloting interface
     private Ref<ManualCopterPilotingItf> pilotingItfRef = null;
 
+    // Reference to the current Drone Stream Server Peripheral
+    private Ref<StreamServer> streamServerRef = null;
+
+    // Reference to the current Drone Livestream
+    private Ref<CameraLive> liveStreamRef = null;
+
     // Drone State TextView
     private TextView droneStateTxt;
 
@@ -43,6 +54,9 @@ public class MainActivity extends AppCompatActivity {
 
     // Take Off / Land Button
     private Button takeOffLandBtn;
+
+    // Video Stream View
+    private GsdkStreamView streamView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -102,6 +116,7 @@ public class MainActivity extends AppCompatActivity {
         monitorDroneState();
         monitorDroneBatteryLevel();
         monitorPilotingInterface();
+        startVideoStream();
     }
 
     /*  Stop the drone monitors  */
@@ -114,12 +129,21 @@ public class MainActivity extends AppCompatActivity {
 
         pilotingItfRef.close();
         pilotingItfRef = null;
+
+        liveStreamRef.close();
+        liveStreamRef = null;
+
+        streamServerRef.close();
+        streamServerRef = null;
+
+        livestream = null;
     }
 
     private void resetDroneUi() {
         droneStateTxt.setText(DeviceState.ConnectionState.DISCONNECTED.toString());
         droneBatteryTxt.setText("-%");
         takeOffLandBtn.setEnabled(false);
+        streamView.setStream(null);
     }
 
     /*  Monitor current drone state  */
@@ -192,5 +216,56 @@ public class MainActivity extends AppCompatActivity {
                 takeOffLandBtn.setEnabled(false);
                 break;
         }
+    }
+
+    /*  Starts the Video Stream  */
+    private void startVideoStream() {
+        // Monitor the stream service
+        streamServerRef = drone.getPeripheral(StreamServer.class, new Ref.Observer<StreamServer>() {
+            @Override
+            public void onChanged(@Nullable StreamServer streamServer) {
+                if (streamServer != null) {
+                    // Enable Streaming
+                    if (!streamServer.streamingEnabled()) {
+                        streamServer.enableStreaming(true);
+                    }
+
+                    // Monitor the livestream
+                    if (liveStreamRef == null)
+                    {
+                        liveStreamRef = streamServer.live(new Ref.Observer<CameraLive>() {
+                            @Override
+                            public void onChanged(@Nullable CameraLive cameraLive) {
+                                if (cameraLive != null) {
+                                    if (livestream == null)
+                                    {
+                                        // It is a new livestream
+                                        // Set the live stream as the stream to be rendered
+                                        // by the stream view
+                                        streamView.setStream(cameraLive);
+                                    }
+
+                                    // Play the livestream
+                                    if (cameraLive.playState() != CameraLive.PlayState.PLAYING) {
+                                        cameraLive.play();
+                                    }
+                                }
+                                else {
+                                    streamView.setStream(null);
+                                }
+                                livestream = cameraLive;
+                            }
+                        });
+                    }
+                }
+                else {
+                    // Stop monitoring the livestream
+                    liveStreamRef.close();
+                    liveStreamRef = null;
+                    // Stop rendering the stream
+                    streamView.setStream(null);
+                }
+            }
+        });
     }
 }

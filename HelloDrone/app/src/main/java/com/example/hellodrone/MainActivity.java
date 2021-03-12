@@ -13,6 +13,7 @@ import com.parrot.drone.groundsdk.ManagedGroundSdk;
 import com.parrot.drone.groundsdk.Ref;
 import com.parrot.drone.groundsdk.device.DeviceState;
 import com.parrot.drone.groundsdk.device.Drone;
+import com.parrot.drone.groundsdk.device.RemoteControl;
 import com.parrot.drone.groundsdk.device.instrument.BatteryInfo;
 import com.parrot.drone.groundsdk.device.peripheral.StreamServer;
 import com.parrot.drone.groundsdk.device.peripheral.stream.CameraLive;
@@ -31,6 +32,9 @@ public class MainActivity extends AppCompatActivity {
     // Current Drone Livestream
     private CameraLive livestream = null;
 
+    // Current Remote Control Instance
+    private RemoteControl rc = null;
+
     // Reference to the current Drone State
     private Ref<DeviceState> droneStateRef = null;
 
@@ -46,11 +50,23 @@ public class MainActivity extends AppCompatActivity {
     // Reference to the current Drone Livestream
     private Ref<CameraLive> liveStreamRef = null;
 
+    // Reference to the current remote control state
+    private Ref<DeviceState> rcStateRef = null;
+
+    // Reference to the current remote control battery info instrument
+    private Ref<BatteryInfo> rcBatteryInfoRef = null;
+
     // Drone State TextView
     private TextView droneStateTxt;
 
     // Drone Battery Level TextView
     private TextView droneBatteryTxt;
+
+    // RC State TextView
+    private TextView rcStateTxt;
+
+    // RC Battery Level TextView
+    private TextView rcBatteryTxt;
 
     // Take Off / Land Button
     private Button takeOffLandBtn;
@@ -66,6 +82,9 @@ public class MainActivity extends AppCompatActivity {
         // Get user interface instances
         droneStateTxt = findViewById(R.id.droneStateTxt);
         droneBatteryTxt = findViewById(R.id.droneBatteryTxt);
+        streamView = findViewById(R.id.streamView);
+        rcStateTxt = findViewById(R.id.rcStateTxt);
+        rcBatteryTxt = findViewById(R.id.rcBatteryTxt);
         takeOffLandBtn = findViewById(R.id.takeOffLandBt);
         takeOffLandBtn.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -76,6 +95,7 @@ public class MainActivity extends AppCompatActivity {
 
         // Initialise user interface default values
         droneStateTxt.setText(DeviceState.ConnectionState.DISCONNECTED.toString());
+        rcStateTxt.setText(DeviceState.ConnectionState.DISCONNECTED.toString());
 
         // Get the GroundSDK Session
         groundSdk = ManagedGroundSdk.obtainSession(this);
@@ -94,6 +114,7 @@ public class MainActivity extends AppCompatActivity {
                     if (autoConnection.getStatus() != AutoConnection.Status.STARTED) {
                         autoConnection.start();
                     }
+
                     // If the drone has changed
                     if (MainActivity.this.drone != null) {
                         if (!MainActivity.this.drone.getUid().equals(autoConnection.getDrone().getUid())) {
@@ -101,10 +122,28 @@ public class MainActivity extends AppCompatActivity {
                             resetDroneUi();
                         }
                     }
+
                     // Monitor the new drone
+                    MainActivity.this.drone = autoConnection.getDrone();
                     if (MainActivity.this.drone != null) {
-                        MainActivity.this.drone = autoConnection.getDrone();
                         MainActivity.this.startDroneMonitors();
+                    }
+
+                    // If the remote control has changed
+                    if (MainActivity.this.rc != null) {
+                        if (!MainActivity.this.rc.getUid().equals(autoConnection.getRemoteControl().getUid())) {
+                            // Stop monitoring the old remote
+                            stopRcMonitors();
+
+                            // Reset Remote User Interface
+                            resetRcUi();
+                        }
+                    }
+
+                    // Monitor the new remote
+                    MainActivity.this.rc = autoConnection.getRemoteControl();
+                    if (MainActivity.this.rc != null) {
+                        startRcMonitors();
                     }
                 }
             }
@@ -139,11 +178,33 @@ public class MainActivity extends AppCompatActivity {
         livestream = null;
     }
 
+    /*  Start the remote control monitors  */
+    private void startRcMonitors() {
+        monitorRcState();
+        monitorRcBatteryLevel();
+    }
+
+    /*  Stop the remote control monitors  */
+    private void stopRcMonitors() {
+        rcStateRef.close();
+        rcStateRef = null;
+
+        rcBatteryInfoRef.close();
+        rcBatteryInfoRef = null;
+    }
+
+    /*  Reset Drone UI  */
     private void resetDroneUi() {
         droneStateTxt.setText(DeviceState.ConnectionState.DISCONNECTED.toString());
         droneBatteryTxt.setText("-%");
         takeOffLandBtn.setEnabled(false);
         streamView.setStream(null);
+    }
+
+    /*  Reset RC UI  */
+    private void resetRcUi() {
+        rcStateTxt.setText(DeviceState.ConnectionState.DISCONNECTED.toString());
+        rcBatteryTxt.setText("-%");
     }
 
     /*  Monitor current drone state  */
@@ -177,6 +238,28 @@ public class MainActivity extends AppCompatActivity {
                     takeOffLandBtn.setEnabled(false);
                 else
                     managePilotingItfState(manualCopterPilotingItf);
+            }
+        });
+    }
+
+    /*  Monitor current Remote Control State  */
+    private void monitorRcState() {
+        rcStateRef = rc.getState(new Ref.Observer<DeviceState>() {
+            @Override
+            public void onChanged(@Nullable DeviceState deviceState) {
+                assert deviceState != null;
+                rcStateTxt.setText(deviceState.getConnectionState().toString());
+            }
+        });
+    }
+
+    /*  Monitor current Remote Control Battery Level  */
+    private void monitorRcBatteryLevel() {
+        rcBatteryInfoRef = rc.getInstrument(BatteryInfo.class, new Ref.Observer<BatteryInfo>() {
+            @Override
+            public void onChanged(@Nullable BatteryInfo batteryInfo) {
+                assert batteryInfo != null;
+                rcBatteryTxt.setText(batteryInfo.getBatteryLevel() + "%");
             }
         });
     }

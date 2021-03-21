@@ -116,33 +116,26 @@ public class MainActivity extends AppCompatActivity {
                     }
 
                     // If the drone has changed
-                    if (MainActivity.this.drone != null) {
-                        if (!MainActivity.this.drone.getUid().equals(autoConnection.getDrone().getUid())) {
-                            MainActivity.this.stopDroneMonitors();
-                            resetDroneUi();
-                        }
+                    if (drone != null && autoConnection.getDrone() == null) {
+                        stopDroneMonitors();
+                        resetDroneUi();
                     }
 
                     // Monitor the new drone
-                    MainActivity.this.drone = autoConnection.getDrone();
-                    if (MainActivity.this.drone != null) {
-                        MainActivity.this.startDroneMonitors();
+                    if (autoConnection.getDrone() != null) {
+                        drone = autoConnection.getDrone();
+                        startDroneMonitors();
                     }
 
                     // If the remote control has changed
-                    if (MainActivity.this.rc != null) {
-                        if (!MainActivity.this.rc.getUid().equals(autoConnection.getRemoteControl().getUid())) {
-                            // Stop monitoring the old remote
-                            stopRcMonitors();
-
-                            // Reset Remote User Interface
-                            resetRcUi();
-                        }
+                    if (rc != null && autoConnection.getRemoteControl() == null) {
+                        stopRcMonitors();
+                        resetRcUi();
                     }
 
                     // Monitor the new remote
-                    MainActivity.this.rc = autoConnection.getRemoteControl();
-                    if (MainActivity.this.rc != null) {
+                    if (autoConnection.getRemoteControl() != null) {
+                        rc = autoConnection.getRemoteControl();
                         startRcMonitors();
                     }
                 }
